@@ -121,4 +121,6 @@ claude plugin test .
 
 Код — в `hooks/`: `register.tsx` подключает хуки и рисует полосу, `draw.ts` считает и рисует пилюли и карточки в SVG, `tasks.ts` разбирает вывод фоновых задач.
 
-Иконки — [Lucide](https://lucide.dev) (лицензия ISC).
+## Лицензия
+
+[MIT](LICENSE). Иконки — [Lucide](https://lucide.dev) (лицензия ISC).
