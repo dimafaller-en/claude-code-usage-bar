@@ -1,0 +1,4 @@
+# Engine typings written locally by /plugin-types
+.claude-plugin/types/
+tsconfig.json
+node_modules/

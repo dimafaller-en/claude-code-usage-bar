@@ -1,0 +1,8 @@
+{
+  "name": "usage-bar",
+  "version": "0.1.0",
+  "description": "Лимиты подписки, токены и примерная стоимость сессии над полем ввода",
+  "author": { "name": "dimafaller-en" },
+  "homepage": "https://github.com/dimafaller-en/claude-code-usage-bar",
+  "types": "./types/index.d.ts"
+}
