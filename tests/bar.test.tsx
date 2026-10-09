@@ -116,7 +116,7 @@ test('both windows, the session tokens of every loop and the cost, with where th
   expect(source).toContain(`>Расходы ≈${dollars(total)}<`)
 
   const text = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect(await text.find({ type: 'Text', text: /^5h 20% · сброс через 2h 40m │ 7d 58% · сброс через 1d 7h │ ≈\$/ })).toBeDefined()
+  expect(await text.find({ type: 'Text', text: /^5h 20% │ 7d 58% │ ≈\$/ })).toBeDefined()
   await text.unmount()
 })
 
@@ -179,7 +179,8 @@ test('a window that runs out before its reset says when, and each window warns o
   // An hour into the window at 40%: the window's own pace ends it in an hour and a half, before the reset in four.
   await reading(40)
   let shown = await pictures($)
-  expect(shown.source).toContain('>хватит на ~1h 30m<')
+  expect(shown.source).not.toContain('>хватит на ~1h 30m<')
+  expect(shown.source).toContain('class="icon-alert"')
   expect(shown.source).toContain('>при текущем темпе хватит на ~1h 30m<')
   expect(toasts).toEqual([])
 
@@ -187,7 +188,7 @@ test('a window that runs out before its reset says when, and each window warns o
   await clock.advance(30 * 60_000)
   await reading(85)
   shown = await pictures($)
-  expect(shown.source).toContain('>хватит на ~10m<')
+  expect(shown.source).toContain('>при текущем темпе хватит на ~10m<')
   expect(toasts).toEqual(['Лимит 5h: 85%, сброс через 3h 30m'])
 
   await reading(86)

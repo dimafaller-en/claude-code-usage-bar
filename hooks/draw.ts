@@ -139,34 +139,38 @@ function cut(text: string, max: number): string {
 
 // --- pills -------------------------------------------------------------------
 
-// Drawn in a monospace face, so a run of text is as wide as its characters.
+// Drawn in the app's own sans face, quiet like the controls under the prompt: no fills behind the words,
+// thin neutral meters, the warning colour only where something needs a look. A run of text is measured
+// a little wide on purpose (the face is not known here), so nothing ever runs into its neighbour.
 const FONT = 12
 const CHAR = 7.2
-export const HEIGHT = 24
-const PAD = 9
-const GAP = 6
-const ICON = 14
-const BAR = 40
-const PILL_GAP = 6
+export const HEIGHT = 22
+const GAP = 5
+const ICON = 13
+const BAR = 30
+const PILL_GAP = 18
+
+// The width of a run of text in the sans face at FONT, rounded up a touch.
+function textWidth(text: string): number {
+  let w = 0
+  for (const ch of text) {
+    w += ch === ' ' || ch === ' ' ? 3.4 : ch === '%' ? 10 : /[0-9$]/.test(ch) ? 7 : /[.,:·|'~]/.test(ch) ? 3.6 : /[A-ZА-ЯЁ]/.test(ch) ? 8 : /[а-яё]/.test(ch) ? 6 : 6.1
+  }
+
+  return Math.ceil(w * 1.03)
+}
 
 // Lucide icons (ISC), on their 24-unit grid.
 const ICONS = {
-  gauge: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
-  calendar: '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>',
-  history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
-  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
-  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
-  layers: '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
   coin: '<circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/>',
   activity: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
-  book: '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
   alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
 }
 
 export type Tone = '5h' | '7d' | 'ctx' | 'tasks' | 'in' | 'out' | 'cache' | 'cost'
 
-// `isAlert` draws a part in the warning colour, whatever its pill's tone.
+// `isAlert` draws a part in the warning colour.
 type Part =
   | { kind: 'icon'; icon: keyof typeof ICONS; isAlert?: boolean }
   | { kind: 'text'; text: string; isBold?: boolean; isAlert?: boolean }
@@ -180,78 +184,64 @@ function widthOf(part: Part): number {
     case 'icon':
       return ICON
     case 'text':
-      return part.text.length * CHAR
+      return textWidth(part.text)
     case 'bar':
       return BAR
     case 'divider':
-      return 1
+      return 3
   }
 }
 
-function drawPart(part: Part, tone: Tone, x: number): string {
+function drawPart(part: Part, x: number): string {
   const mid = HEIGHT / 2
   switch (part.kind) {
     case 'icon':
-      return `<g class="${part.isAlert ? 'icon-alert' : `icon-${tone}`}" transform="translate(${x} ${mid - ICON / 2}) scale(${ICON / 24})" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[part.icon]}</g>`
+      return `<g class="${part.isAlert ? 'icon-alert' : 'icon'}" transform="translate(${x} ${mid - ICON / 2}) scale(${ICON / 24})" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[part.icon]}</g>`
     case 'text':
-      return `<text class="${part.isAlert ? 'alert' : part.isBold ? 'strong' : `ink-${tone}`}" x="${x}" y="${mid}" dominant-baseline="central"${part.isBold ? ' font-weight="700"' : ''}>${escapeXml(part.text)}</text>`
+      return `<text class="${part.isAlert ? 'alert' : part.isBold ? 'strong' : 'ink'}" x="${x}" y="${mid}" dominant-baseline="central"${part.isBold ? ' font-weight="500"' : ''}>${escapeXml(part.text)}</text>`
     case 'bar': {
       const fill = Math.round(Math.max(0, Math.min(1, part.share)) * BAR)
-      const track = `<rect class="track" x="${x}" y="${mid - 2.5}" width="${BAR}" height="5" rx="2.5"/>`
-      const done = fill > 0 ? `<rect class="${part.isAlert ? 'alert' : 'fill'}" x="${x}" y="${mid - 2.5}" width="${Math.max(fill, 5)}" height="5" rx="2.5"/>` : ''
+      const track = `<rect class="track" x="${x}" y="${mid - 1.5}" width="${BAR}" height="3" rx="1.5"/>`
+      const done = fill > 0 ? `<rect class="${part.isAlert ? 'fill-alert' : 'fill'}" x="${x}" y="${mid - 1.5}" width="${Math.max(fill, 3)}" height="3" rx="1.5"/>` : ''
       const markAt = part.mark === null ? 0 : x + Math.round(part.mark * BAR)
-      const mark = part.mark === null ? '' : `<line class="mark" x1="${markAt}" x2="${markAt}" y1="${mid - 6}" y2="${mid + 6}" stroke-width="2" stroke-linecap="round"/>`
+      const mark = part.mark === null ? '' : `<line class="mark" x1="${markAt}" x2="${markAt}" y1="${mid - 4}" y2="${mid + 4}" stroke-width="1.5" stroke-linecap="round"/>`
       return track + done + mark
     }
     case 'divider':
-      return `<line class="divider" x1="${x + 0.5}" x2="${x + 0.5}" y1="${mid - 6}" y2="${mid + 6}" stroke-width="1"/>`
+      return `<circle class="dot" cx="${x + 1.5}" cy="${mid}" r="1.2"/>`
   }
 }
 
-// One rounded pill of parts, laid out left to right; its markup and how wide it came out.
-function drawPill({ tone, parts }: Pill, x: number): { markup: string; width: number } {
-  let at = x + PAD
+// One run of parts, laid out left to right with no ground of its own; its markup and how wide it came out.
+function drawPill({ parts }: Pill, x: number): { markup: string; width: number } {
+  let at = x
   const drawn: string[] = []
   parts.forEach((part, i) => {
-    drawn.push(drawPart(part, tone, at))
+    drawn.push(drawPart(part, at))
     at += widthOf(part) + (i < parts.length - 1 ? GAP : 0)
   })
-  const width = at + PAD - x
 
-  return { markup: `<rect class="bg-${tone}" x="${x}" y="0" width="${width}" height="${HEIGHT}" rx="${HEIGHT / 2}"/>${drawn.join('')}`, width }
+  return { markup: drawn.join(''), width: at - x }
 }
 
-// Both themes by `prefers-color-scheme`, which a plugin can only hope follows the app's theme. A guess
-// that misses still reads: a pill draws its own background, and a card paints its own ground in the
-// frame's color, so either is dark on light or light on dark whatever is around it.
-// Icon classes set strokes only: a fill there would override `fill="none"`.
+// Both themes by `prefers-color-scheme`, which a plugin can only hope follows the app's theme. The colours are
+// the app's own neutrals (secondary text, a hairline track), so a guess that misses still reads on either ground;
+// a card paints its own ground. Icon classes set strokes only: a fill there would override `fill="none"`.
+const FACE = `"Anthropic Sans",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif`
 const STYLE = `
-text{font-family:ui-monospace,"SF Mono","Cascadia Mono",Consolas,monospace;font-size:${FONT}px}
-.strong{fill:#1f2a26}.track{fill:#000;fill-opacity:.12}.fill{fill:#9dbf86}.mark{stroke:#2b2f2d}.divider{stroke:#000;stroke-opacity:.15}
-.bg-5h{fill:#dce9e2}.ink-5h{fill:#4a5a54}.icon-5h{stroke:#5b8a76}.bar-5h{fill:#9dbf86}
-.bg-7d{fill:#e4e0f5}.ink-7d{fill:#4d4668}.icon-7d{stroke:#7b5cd6}.bar-7d{fill:#a995e4}
-.bg-ctx{fill:#e1ecef}.ink-ctx{fill:#28414a}.icon-ctx{stroke:#3f7f93}.bar-ctx{fill:#8fbccb}
-.bg-in{fill:#f4ddd7}.ink-in{fill:#3d2b27}.icon-in{stroke:#c4553f}.bar-in{fill:#e09a8a}
-.bg-out{fill:#dcebdf}.ink-out{fill:#26392b}.icon-out{stroke:#4c9a5c}.bar-out{fill:#8cc497}
-.bg-cache{fill:#dfe2f6}.ink-cache{fill:#2b3060}.icon-cache{stroke:#5866cf}.bar-cache{fill:#9aa3e6}
-.bg-cost{fill:#f0e6cd}.ink-cost{fill:#3b311a}.icon-cost{stroke:#b38a2d}.bar-cost{fill:#d9b45c}
-.bg-tasks{fill:#dbeaf3}.ink-tasks{fill:#22394a}.icon-tasks{stroke:#3b82b8}.bar-tasks{fill:#7fb2d8}
-.head{fill:#8a8f8c;font-size:11px}.label{fill:#2a2d2b}.value{fill:#4a4f4c}
-.alert{fill:#c2531c}.icon-alert{stroke:#c2531c}
-.st-running{fill:#3b82b8}.st-done{fill:#2b9a62}.st-failed{fill:#e0484d}.st-stopped{fill:#8b8d98}
+text{font-family:${FACE};font-size:${FONT}px;font-variant-numeric:tabular-nums}
+.ink{fill:#73726c}.strong{fill:#3d3d3a}.icon{stroke:#8d8c86}.track{fill:#1f1e1d;fill-opacity:.1}.fill{fill:#8d8c86}.mark{stroke:#3d3d3a;stroke-opacity:.6}.dot{fill:#b4b2ab}
+.alert,.head.alert{fill:#c4561d}.icon-alert{stroke:#c4561d}.fill-alert{fill:#d9773a}
+.bar-5h,.bar-7d,.bar-ctx,.bar-in,.bar-out,.bar-cache,.bar-cost,.bar-tasks{fill:#8d8c86}
+.head{fill:#8d8c86;font-size:11px}.label{fill:#3d3d3a}.value{fill:#73726c}
+.st-running{fill:#2f7fc1}.st-done{fill:#3a8a55}.st-failed{fill:#c63d3d}.st-stopped{fill:#8d8c86}
 .ground{fill:#fff}
 @media (prefers-color-scheme:dark){
-.strong{fill:#ecebe8}.track{fill:#fff;fill-opacity:.14}.mark{stroke:#e8e6e2}.divider{stroke:#fff;stroke-opacity:.16}
-.bg-5h{fill:#27362f}.ink-5h{fill:#b5c7be}.icon-5h{stroke:#80b49d}
-.bg-7d{fill:#302a48}.ink-7d{fill:#c8c0e8}.icon-7d{stroke:#a58ef0}
-.bg-ctx{fill:#253741}.ink-ctx{fill:#b8d2db}.icon-ctx{stroke:#70b1c5}
-.bg-in{fill:#412a25}.ink-in{fill:#e8c5bb}.icon-in{stroke:#e27b64}
-.bg-out{fill:#25392c}.ink-out{fill:#bedbc4}.icon-out{stroke:#70c084}
-.bg-cache{fill:#2a2f4e}.ink-cache{fill:#c3c8f0}.icon-cache{stroke:#8b97ec}
-.bg-cost{fill:#3c331f}.ink-cost{fill:#e6d6ad}.icon-cost{stroke:#d7ab4a}
-.bg-tasks{fill:#24394a}.ink-tasks{fill:#b8d4e8}.icon-tasks{stroke:#6ba9d8}
-.ground{fill:#20201f}.head{fill:#8f8d89}.label{fill:#d4d2ce}.value{fill:#b3b1ad}
-.alert{fill:#e8834f}.icon-alert{stroke:#e8834f}.st-stopped{fill:#9a9894}}`
+.ink{fill:#a6a39c}.strong{fill:#e9e7e2}.icon{stroke:#8f8c86}.track{fill:#fff;fill-opacity:.13}.fill{fill:#a6a39c}.mark{stroke:#e9e7e2;stroke-opacity:.65}.dot{fill:#5f5d58}
+.alert,.head.alert{fill:#e79a62}.icon-alert{stroke:#e79a62}.fill-alert{fill:#e79a62}
+.bar-5h,.bar-7d,.bar-ctx,.bar-in,.bar-out,.bar-cache,.bar-cost,.bar-tasks{fill:#a6a39c}
+.ground{fill:#262624}.head{fill:#8f8c86}.label{fill:#e2e0da}.value{fill:#a6a39c}
+.st-running{fill:#6aa9df}.st-done{fill:#6dbb84}.st-failed{fill:#e46a6a}.st-stopped{fill:#9a9894}}`
 
 function svg(width: number, height: number, body: string): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><style>${STYLE}</style>${body}</svg>`
@@ -333,7 +323,7 @@ export function cardSvg({ rows }: Card): { source: string; width: number; height
   rows.forEach((row, i) => {
     const mid = y + rowHeight(row, i) - (row.kind === 'item' && row.detail !== undefined ? DETAIL : 0) - ROW / 2 - 1
     if (row.kind === 'title') {
-      drawn.push(textAt('strong', fits(row.text, right - CARD_PAD, CHAR), CARD_PAD, mid, ' font-weight="700"'))
+      drawn.push(textAt('strong', fits(row.text, right - CARD_PAD, CHAR), CARD_PAD, mid, ' font-weight="500"'))
     } else if (row.kind === 'head' || row.kind === 'note') {
       drawn.push(textAt(row.kind === 'note' && row.isAlert === true ? 'head alert' : 'head', fits(row.text, right - CARD_PAD, SMALL_CHAR), CARD_PAD, mid))
     } else {
@@ -524,18 +514,15 @@ export function limitPill(limit: UsageLimit, at: number, out: number | null = nu
   const resetsAt = resetOf(limit)
   const hasReset = !Number.isNaN(resetsAt)
   const mark = window !== undefined && hasReset ? Math.max(0, Math.min(1, 1 - (resetsAt - at) / window)) : null
+  // Runs out before the reset: the bar, the figure and a sign in the warning colour; the times live in the card.
+  const isShort = out !== null
   const parts: Part[] = [
-    { kind: 'icon', icon: tone === '7d' ? 'calendar' : 'gauge' },
     { kind: 'text', text: LABEL[limit.kind] ?? limit.kind },
-    { kind: 'bar', share: limit.percentUsed / 100, mark },
-    { kind: 'text', text: `${Math.round(limit.percentUsed)}%`, isBold: true },
+    { kind: 'bar', share: limit.percentUsed / 100, mark, isAlert: isShort },
+    { kind: 'text', text: `${Math.round(limit.percentUsed)}%`, isBold: true, isAlert: isShort },
   ]
-  // Runs out before the reset: when, in the warning colour, in the reset's place (the card keeps the reset).
-  if (hasReset && out === null) {
-    parts.push({ kind: 'divider' }, { kind: 'icon', icon: 'history' }, { kind: 'text', text: timeLeft(resetsAt - at) })
-  }
-  if (out !== null) {
-    parts.push({ kind: 'divider' }, { kind: 'icon', icon: 'alert', isAlert: true }, { kind: 'text', text: `хватит на ~${timeLeft(out - at)}`, isAlert: true })
+  if (isShort) {
+    parts.push({ kind: 'icon', icon: 'alert', isAlert: true })
   }
 
   return { tone, parts }
@@ -590,9 +577,9 @@ export function contextPill(fill: ContextFill): Pill | null {
   const isNear = isNearCompact(fill)
   const mark = fill.threshold === null ? null : Math.max(0, Math.min(1, fill.threshold / fill.window))
   const parts: Part[] = [
-    { kind: 'icon', icon: 'book', isAlert: isNear },
+    { kind: 'text', text: 'контекст', isAlert: isNear },
     { kind: 'bar', share: fill.tokens / fill.window, mark, isAlert: isNear },
-    { kind: 'text', text: `${Math.round((fill.tokens / fill.window) * 100)}%`, isBold: true },
+    { kind: 'text', text: `${Math.round((fill.tokens / fill.window) * 100)}%`, isBold: true, isAlert: isNear },
     { kind: 'divider' },
     left === null ? { kind: 'text', text: `${count(fill.tokens)}/${count(fill.window)}` } : { kind: 'text', text: left > 0 ? `до сжатия ${count(left)}` : 'сжатие вот-вот', isAlert: isNear },
   ]
@@ -653,10 +640,8 @@ export function groupsOf({ limits: windows, tasks: work, totals: t, spend: s, en
   if (known.length > 0) {
     const outs = known.map(l => runsOutAt(l, trails[l.kind], at))
     const words = known.map((l, i) => {
-      const resetsAt = resetOf(l)
       const out = outs[i] ?? null
-      const reset = Number.isNaN(resetsAt) ? '' : ` · сброс через ${timeLeft(resetsAt - at)}`
-      return `${LABEL[l.kind]} ${Math.round(l.percentUsed)}%${reset}${out === null ? '' : ` · хватит на ~${timeLeft(out - at)}`}`
+      return `${LABEL[l.kind]} ${Math.round(l.percentUsed)}%${out === null ? '' : ' ⚠ не хватит до сброса'}`
     })
     groups.push({ id: 'limits', pills: known.map((l, i) => limitPill(l, at, outs[i] ?? null)), words: words.join(' │ '), card: limitsCard(known, trails, at) })
   }
