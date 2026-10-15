@@ -169,8 +169,10 @@ test('a window that runs out before its reset says when, and each window warns o
   mock.store(on)
   engine(on, clock)
   const toasts: string[] = []
+  // A call on `$` answers with `{ value }`; a toast's value is nothing.
   on('ui.toast', (_, e) => {
     toasts.push(e.text)
+    return { value: undefined }
   })
   const start = clock.now()
   const resetsAt = new Date(start + 4 * 3_600_000).toISOString()
