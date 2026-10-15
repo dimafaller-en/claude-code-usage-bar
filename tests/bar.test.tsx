@@ -260,3 +260,24 @@ test('the card is hidden in the keyed box of its pill until the pointer is on it
   expect(JSON.stringify(keyed?.children)).toContain('Расходы')
   await ui.unmount()
 })
+
+test('the side panel shows each window with its reset, and the cost by kind of token', async ($, on) => {
+  const clock = mock.clock(on)
+  mock.store(on)
+  engine(on, clock)
+
+  const at = clock.now()
+  await $.session.measure({
+    context: { window: 1_000_000 },
+    rateLimits: [{ kind: 'five_hour', percentUsed: 20, resetsAt: new Date(at + 160 * 60_000).toISOString() }],
+    changed: ['rateLimits'],
+  })
+  await step($)
+
+  const ui = await $.ui.mount({ plugin: 'usage-bar', component: 'Pane', requestId: 'usage', surface: 'desktop', props: { title: 'Лимиты и расходы', isFocused: false, bodyColumns: 40, placement: 'dock', scroll: { offset: 0, bodyRows: 30 }, view: {} } } as never)
+  for (const text of ['20%', '5 часов', 'сброс через 2h 40m', 'хватит до сброса', 'Запись в кэш', 'Opus 5.5']) {
+    expect(await ui.find({ type: 'Text', text })).toBeDefined()
+  }
+  expect((await ui.findAll({ type: 'Svg' })).length).toBe(2)
+  await ui.unmount()
+})

@@ -4,6 +4,8 @@ import type { EngineInterface, Register, SessionContextUsage, Timer } from 'clau
 import type { BgTask, SpendBreakdown, TaskKind, TaskStatus, UsageLimit, UsageTotals } from '../types'
 import { addReading, addSpend, addTotals, cardSvg, describe, groupSvg, groupsOf, NO_SPEND, spacerSvg, timeLeft, ZERO } from './draw.ts'
 import type { BarData, Group } from './draw.ts'
+import { BAR_HEIGHT, barSvg, COLORS, GLYPH, panelOf, STATUS_COLOR } from './panel.ts'
+import type { PanelRow } from './panel.ts'
 import { commandTitle, cut, KEEP_FINISHED_MS, lines, notified, outputPathOf, progressOf } from './tasks.ts'
 
 const limits = atom({ plugin: 'usage-bar', key: 'limits' } as const, [])
@@ -180,10 +182,45 @@ function sideOf(group: Group, groups: readonly Group[]): 'left' | 'right' {
   return groups.indexOf(group) === groups.length - 1 && groups.length > 1 ? 'right' : 'left'
 }
 
+// --- side panel --------------------------------------------------------------
+
+// The band's figures in full, in a panel the app seats beside the transcript: opened and closed with `/usage-panel`.
+const PANE = 'usage'
+const PANE_TITLE = 'Лимиты и расходы'
+
+async function readData($: Dollar): Promise<BarData> {
+  const [windows, work, at, t, s, engine, fill, trail] = await Promise.all([
+    read($, limits),
+    read($, tasks),
+    read($, now),
+    read($, totals),
+    read($, spend),
+    read($, engineUsd),
+    read($, context),
+    read($, trails),
+  ])
+
+  return { limits: windows, tasks: work, totals: t, spend: s, engineUsd: engine, context: fill, trails: trail, at }
+}
+
+async function isPaneOpen($: Dollar): Promise<boolean> {
+  return (await $.ui.panes()).some(p => p.id === PANE)
+}
+
+// A terminal draws no pictures: its bar is a run of block characters.
+const TEXT_BAR = 24
+function textBar(share: number): string {
+  const full = Math.round(Math.max(0, Math.min(1, share)) * TEXT_BAR)
+
+  return '█'.repeat(full) + '░'.repeat(TEXT_BAR - full)
+}
+
 // --- hooks -------------------------------------------------------------------
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    // A host without commands still gets the rest of the start.
+    await $.command.register({ name: 'usage-panel', description: 'Показать или скрыть панель «Лимиты и расходы»' }).catch(() => undefined)
     const usage = await $.session.usage()
     await remember($, usage.rateLimits)
     await update($, engineUsd, () => usage.cost?.usd ?? null)
@@ -336,23 +373,111 @@ export const register: Register = on => {
     return next(e)
   })
 
+  on('command.run', { command: 'usage-panel' }, async $ => {
+    if (await isPaneOpen($)) {
+      await $.ui.close({ id: PANE })
+      return { text: 'Панель «Лимиты и расходы» скрыта. Вернуть: /usage-panel' }
+    }
+    await $.ui.open({ id: PANE, title: PANE_TITLE })
+
+    return { text: 'Панель «Лимиты и расходы» открыта.' }
+  })
+
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
+    const table = $.ui.resolve(e)
+    const { Box, Text } = table
+    const Svg = 'Svg' in table ? table.Svg : null
+    const sections = panelOf(await readData($))
+    if (sections.length === 0) {
+      return (
+        <Box paddingX={1}>
+          <Text dimColor>Данные появятся после первого ответа модели</Text>
+        </Box>
+      )
+    }
+
+    const row = (r: PanelRow, key: string) => {
+      switch (r.kind) {
+        case 'headline':
+          return (
+            <Box key={key} flexDirection="row" justifyContent="space-between" alignItems="flex-end">
+              <Text bold {...(r.isAlert ? { color: COLORS.alert } : {})}>
+                {r.text}
+              </Text>
+              {r.aside === undefined ? null : <Text dimColor>{r.aside}</Text>}
+            </Box>
+          )
+        case 'bar': {
+          const alt = r.segments.map(s => `${Math.round(s.share * 100)}%`).join(' + ')
+          return Svg === null ? (
+            <Text key={key} dimColor>
+              {textBar(r.segments.reduce((sum, s) => sum + s.share, 0))}
+            </Text>
+          ) : (
+            <Box key={key} marginY={0}>
+              <Svg source={barSvg(r.segments, r.mark)} alt={alt} height={BAR_HEIGHT} />
+            </Box>
+          )
+        }
+        case 'item': {
+          const tint = r.isAlert ? { color: COLORS.alert } : {}
+          return (
+            <Box key={key} flexDirection="row" justifyContent="space-between">
+              <Box flexDirection="row" flexShrink={1} overflow="hidden">
+                {r.status !== undefined ? <Text color={STATUS_COLOR[r.status]}>{`${GLYPH[r.status]} `}</Text> : null}
+                {r.hue !== undefined ? <Text color={COLORS[r.hue]}>{'■ '}</Text> : null}
+                <Text wrap="truncate-end" {...tint}>
+                  {r.label}
+                </Text>
+              </Box>
+              <Box flexDirection="row" flexShrink={0} columnGap={2}>
+                {r.value === undefined ? null : <Text dimColor>{r.value}</Text>}
+                {r.figure === undefined ? null : (
+                  <Text bold {...tint}>
+                    {r.figure}
+                  </Text>
+                )}
+              </Box>
+            </Box>
+          )
+        }
+        case 'note':
+          return (
+            <Box key={key} flexDirection="row" justifyContent="space-between">
+              <Text dimColor>{r.text}</Text>
+              {r.aside === undefined ? null : r.isAlert ? <Text color={COLORS.alert}>{r.aside}</Text> : <Text dimColor>{r.aside}</Text>}
+            </Box>
+          )
+        case 'head':
+          return (
+            <Box key={key} marginTop={1}>
+              <Text dimColor>{r.text}</Text>
+            </Box>
+          )
+        case 'gap':
+          return <Box key={key} marginTop={1} />
+      }
+    }
+
+    // Sections one under another, a blank line between them, like the groups inside the app's Context block.
+    return (
+      <Box flexDirection="column" paddingX={1}>
+        {sections.map((s, i) => (
+          <Box key={`usage-${s.id}`} flexDirection="column" marginTop={i === 0 ? 0 : 1}>
+            {s.rows.map((r, j) => row(r, `usage-${s.id}-${j}`))}
+          </Box>
+        ))}
+      </Box>
+    )
+  })
+
   // Drawn on top of whatever the plugins beneath put in the band.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const below = await next(e)
     if (e.props.hasSurvey) {
       return below
     }
-    const [windows, work, at, t, s, engine, fill, trail] = await Promise.all([
-      read($, limits),
-      read($, tasks),
-      read($, now),
-      read($, totals),
-      read($, spend),
-      read($, engineUsd),
-      read($, context),
-      read($, trails),
-    ])
-    const data: BarData = { limits: windows, tasks: work, totals: t, spend: s, engineUsd: engine, context: fill, trails: trail, at }
+    const data = await readData($)
     const groups = groupsOf(data)
     if (groups.length === 0) {
       return below

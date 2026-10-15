@@ -626,7 +626,7 @@ export type BarData = {
 }
 
 // The windows the bar knows, the five-hour one first whatever order they were reported in.
-function windowsOf(reported: readonly UsageLimit[]): UsageLimit[] {
+export function windowsOf(reported: readonly UsageLimit[]): UsageLimit[] {
   return ['five_hour', 'seven_day'].flatMap(kind => reported.filter(l => l.kind === kind))
 }
 
