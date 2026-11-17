@@ -4,8 +4,9 @@ import type { EngineInterface, Register, SessionContextUsage, Timer } from 'clau
 import type { BgTask, SpendBreakdown, TaskKind, TaskStatus, UsageLimit, UsageTotals } from '../types'
 import { addReading, addSpend, addTotals, cardSvg, describe, groupSvg, groupsOf, NO_SPEND, spacerSvg, timeLeft, ZERO } from './draw.ts'
 import type { BarData, Group } from './draw.ts'
-import { BAR_HEIGHT, barSvg, COLORS, GLYPH, panelOf, STATUS_COLOR } from './panel.ts'
+import { BAR_HEIGHT, barSvg, COLORS, GLYPH, hueColor, panelOf, STATUS_COLOR, statusColor } from './panel.ts'
 import type { PanelRow } from './panel.ts'
+import { lookOf, useLook } from './palette.ts'
 import { commandTitle, cut, KEEP_FINISHED_MS, lines, notified, outputPathOf, progressOf } from './tasks.ts'
 
 const limits = atom({ plugin: 'usage-bar', key: 'limits' } as const, [])
@@ -16,6 +17,8 @@ const engineUsd = atom({ plugin: 'usage-bar', key: 'engineUsd' } as const, null)
 const tasks = atom({ plugin: 'usage-bar', key: 'tasks' } as const, [])
 const context = atom({ plugin: 'usage-bar', key: 'context' } as const, null)
 const trails = atom({ plugin: 'usage-bar', key: 'trails' } as const, {})
+// The colours of the theme a mod last set, seen passing through `$.theme.set`: the engine offers no way to ask.
+const theme = atom({ plugin: 'usage-bar', key: 'theme' } as const, null)
 
 type Dollar = EngineInterface
 
@@ -215,9 +218,30 @@ function textBar(share: number): string {
   return '█'.repeat(full) + '░'.repeat(TEXT_BAR - full)
 }
 
+// The band's own colours, and the look a kept theme makes of them: set after a render hook's last other await,
+// so the synchronous drawing that follows reads this render's look.
+const OWN = { css: null, barCss: null, hue: COLORS, status: STATUS_COLOR }
+async function applyTheme($: Dollar): Promise<void> {
+  const colors = await read($, theme)
+  useLook(colors === null ? null : lookOf(colors, OWN))
+}
+
 // --- hooks -------------------------------------------------------------------
 
 export const register: Register = on => {
+  // Any mod's theme: keep its colours so the band follows them; a clear goes back to the band's own.
+  on('theme.set', async ($, e, next) => {
+    const result = await next(e)
+    await update($, theme, () => (e.colors === undefined ? null : { inputs: e.colors.inputs }))
+    return result
+  })
+
+  on('theme.clear', async ($, e, next) => {
+    const result = await next(e)
+    await update($, theme, () => null)
+    return result
+  })
+
   on('session.start', async ($, e, next) => {
     // A host without commands still gets the rest of the start.
     await $.command.register({ name: 'usage-panel', description: 'Показать или скрыть панель «Лимиты и расходы»' }).catch(() => undefined)
@@ -387,7 +411,9 @@ export const register: Register = on => {
     const table = $.ui.resolve(e)
     const { Box, Text } = table
     const Svg = 'Svg' in table ? table.Svg : null
-    const sections = panelOf(await readData($))
+    const data = await readData($)
+    await applyTheme($)
+    const sections = panelOf(data)
     if (sections.length === 0) {
       return (
         <Box paddingX={1}>
@@ -401,7 +427,7 @@ export const register: Register = on => {
         case 'headline':
           return (
             <Box key={key} flexDirection="row" justifyContent="space-between" alignItems="flex-end">
-              <Text bold {...(r.isAlert ? { color: COLORS.alert } : {})}>
+              <Text bold {...(r.isAlert ? { color: hueColor('alert') } : {})}>
                 {r.text}
               </Text>
               {r.aside === undefined ? null : <Text dimColor>{r.aside}</Text>}
@@ -420,12 +446,12 @@ export const register: Register = on => {
           )
         }
         case 'item': {
-          const tint = r.isAlert ? { color: COLORS.alert } : {}
+          const tint = r.isAlert ? { color: hueColor('alert') } : {}
           return (
             <Box key={key} flexDirection="row" justifyContent="space-between">
               <Box flexDirection="row" flexShrink={1} overflow="hidden">
-                {r.status !== undefined ? <Text color={STATUS_COLOR[r.status]}>{`${GLYPH[r.status]} `}</Text> : null}
-                {r.hue !== undefined ? <Text color={COLORS[r.hue]}>{'■ '}</Text> : null}
+                {r.status !== undefined ? <Text color={statusColor(r.status)}>{`${GLYPH[r.status]} `}</Text> : null}
+                {r.hue !== undefined ? <Text color={hueColor(r.hue)}>{'■ '}</Text> : null}
                 <Text wrap="truncate-end" {...tint}>
                   {r.label}
                 </Text>
@@ -445,7 +471,7 @@ export const register: Register = on => {
           return (
             <Box key={key} flexDirection="row" justifyContent="space-between">
               <Text dimColor>{r.text}</Text>
-              {r.aside === undefined ? null : r.isAlert ? <Text color={COLORS.alert}>{r.aside}</Text> : <Text dimColor>{r.aside}</Text>}
+              {r.aside === undefined ? null : r.isAlert ? <Text color={hueColor('alert')}>{r.aside}</Text> : <Text dimColor>{r.aside}</Text>}
             </Box>
           )
         case 'head':
@@ -478,6 +504,7 @@ export const register: Register = on => {
       return below
     }
     const data = await readData($)
+    await applyTheme($)
     const groups = groupsOf(data)
     if (groups.length === 0) {
       return below

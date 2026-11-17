@@ -1,5 +1,6 @@
 // What the band shows, with no engine in reach: prices, the pills, the hover cards, all as SVG markup.
 import type { BgTask, ContextFill, LimitTrail, SpendBreakdown, TaskStatus, UsageLimit, UsageTotals } from '../types'
+import { currentLook } from './palette.ts'
 import { clock, grouped, human } from './tasks.ts'
 
 export const ZERO: UsageTotals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, usd: 0 }
@@ -228,8 +229,8 @@ function drawPill({ parts }: Pill, x: number): { markup: string; width: number }
 // the app's own neutrals (secondary text, a hairline track), so a guess that misses still reads on either ground;
 // a card paints its own ground. Icon classes set strokes only: a fill there would override `fill="none"`.
 const FACE = `"Anthropic Sans",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif`
+const TEXT_STYLE = `text{font-family:${FACE};font-size:${FONT}px;font-variant-numeric:tabular-nums}`
 const STYLE = `
-text{font-family:${FACE};font-size:${FONT}px;font-variant-numeric:tabular-nums}
 .ink{fill:#73726c}.strong{fill:#3d3d3a}.icon{stroke:#8d8c86}.track{fill:#1f1e1d;fill-opacity:.1}.fill{fill:#8d8c86}.mark{stroke:#3d3d3a;stroke-opacity:.6}.dot{fill:#b4b2ab}
 .alert,.head.alert{fill:#c4561d}.icon-alert{stroke:#c4561d}.fill-alert{fill:#d9773a}
 .bar-5h,.bar-7d,.bar-ctx,.bar-in,.bar-out,.bar-cache,.bar-cost,.bar-tasks{fill:#8d8c86}
@@ -244,7 +245,7 @@ text{font-family:${FACE};font-size:${FONT}px;font-variant-numeric:tabular-nums}
 .st-running{fill:#6aa9df}.st-done{fill:#6dbb84}.st-failed{fill:#e46a6a}.st-stopped{fill:#9a9894}}`
 
 function svg(width: number, height: number, body: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><style>${STYLE}</style>${body}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><style>${TEXT_STYLE}${currentLook()?.css ?? STYLE}</style>${body}</svg>`
 }
 
 // A run of pills as one picture at its natural size: a picture left unsized is stretched to the band.

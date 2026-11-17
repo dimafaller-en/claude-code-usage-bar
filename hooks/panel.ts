@@ -3,6 +3,7 @@
 import type { BgTask, TaskStatus } from '../types'
 import { count, dollars, runsOutAt, timeLeft, windowsOf } from './draw.ts'
 import type { BarData } from './draw.ts'
+import { currentLook } from './palette.ts'
 import { clock } from './tasks.ts'
 
 // The app's own legend colours, the same on either theme.
@@ -28,6 +29,10 @@ const WINDOW_MS: Record<string, number> = { five_hour: 5 * HOUR, seven_day: 7 * 
 const NAME: Record<string, string> = { five_hour: '5 часов', seven_day: 'Неделя' }
 export const GLYPH: Record<TaskStatus, string> = { running: '◐', done: '✓', failed: '✗', stopped: '■' }
 export const STATUS_COLOR: Record<TaskStatus, string> = { running: '#4a8fe7', done: '#3fa67a', failed: '#e05555', stopped: '#8d8c86' }
+
+// The same, from the theme a mod set where there is one (palette.ts).
+export const hueColor = (hue: Hue): string => currentLook()?.hue[hue] ?? COLORS[hue]
+export const statusColor = (status: TaskStatus): string => currentLook()?.status[status] ?? STATUS_COLOR[status]
 
 const share = (n: number) => Math.max(0, Math.min(1, n))
 
@@ -152,7 +157,7 @@ export function barSvg(segments: readonly Segment[], mark: number | null): strin
     if (w <= 0) {
       continue
     }
-    drawn.push(`<rect x="${x}" y="0" width="${Math.max(w - 3, 3)}" height="${H}" fill="${COLORS[seg.hue]}"/>`)
+    drawn.push(`<rect x="${x}" y="0" width="${Math.max(w - 3, 3)}" height="${H}" fill="${hueColor(seg.hue)}"/>`)
     x += w
   }
   const markAt = mark === null ? null : Math.round(share(mark) * W)
@@ -160,7 +165,7 @@ export function barSvg(segments: readonly Segment[], mark: number | null): strin
   const style = `.track{fill:#1f1e1d;fill-opacity:.1}.mark{fill:#3d3d3a}@media (prefers-color-scheme:dark){.track{fill:#fff;fill-opacity:.12}.mark{fill:#e9e7e2}}`
 
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><style>${style}</style>` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><style>${currentLook()?.barCss ?? style}</style>` +
     `<rect class="track" width="${W}" height="${H}"/>${drawn.join('')}${markLine}</svg>`
   )
 }

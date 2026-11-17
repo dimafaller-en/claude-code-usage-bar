@@ -1,3 +1,6 @@
+/** A theme's colour tokens by mode (`gray-900`, `role-accent-300` …: `colors.inputs` of `$.theme.set`). */
+export type ThemePalette = { inputs: { light?: Record<string, string>; dark?: Record<string, string> } }
+
 /** One rate-limit window as the last response reported it. */
 export type UsageLimit = {
   /** `five_hour`, `seven_day`, or a gateway's `spend_limit`. */
@@ -81,6 +84,8 @@ declare module 'claude-code' {
       context: ContextFill | null
       /** Each window's readings since its reset, by kind. */
       trails: Record<string, LimitTrail>
+      /** The colours of the theme a mod last set (`$.theme.set`), null with none: the band draws in them. */
+      theme: ThemePalette | null
     }
   }
 }
